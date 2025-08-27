@@ -200,6 +200,8 @@ def render_cluster_yaml(infra, release_image, access_mode, control_plane, infras
     else:
         cpo_image_flag = ""
 
+    # Ensure custom_domain_flag is always defined
+    custom_domain_flag = ""
     if access_mode == "Private" or access_mode == "PublicAndPrivate":
         if CFG.get("external_dns_domain"):
             custom_domain_flag = f"--external-dns-domain {CFG.get('external_dns_domain')}"
