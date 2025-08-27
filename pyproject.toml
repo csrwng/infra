@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infra-cli"
+version = "0.1.0"
+description = "CLI tools to manage HyperShift infra and clusters"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "inquirer>=3.4.0",
+  "requests>=2.32.0",
+]
+authors = [{ name = "dev" }]
+
+[project.scripts]
+infra = "infra:main"
+hc = "cluster:main"
+
+[tool.setuptools]
+py-modules = ["infra", "cluster", "config", "utils"]
+
