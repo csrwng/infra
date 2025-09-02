@@ -32,7 +32,7 @@ def select_infra():
 
 def get_release_image():
     """Prompts user for a major version or a specific release image pullspec."""
-    choices =  ["4.20", "4.19", "4.18", "4.17", "4.16", "4.15", "4.14"] + ["Specify release image pullspec"]
+    choices =  ["4.21","4.20", "4.19", "4.18", "4.17", "4.16", "4.15", "4.14"] + ["Specify release image pullspec"]
     
     questions = [inquirer.List("selection", message="Select a major version or enter a release image pullspec", choices=choices)]
     answers = safe_prompt(questions)
