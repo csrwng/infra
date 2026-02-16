@@ -45,7 +45,8 @@ def create_infra():
         inquirer.Text("region", message="Region", default=CFG.get("region", "")),
         inquirer.Text("base_domain", message="Base Domain", default=CFG.get("base_domain", "")),
         inquirer.List("external_connectivity", message="External Traffic",
-                      choices=["Public", "Proxy", "SecureProxy", "NAT gateway"])
+                      choices=["Public", "Proxy", "SecureProxy", "NAT gateway"]),
+        inquirer.Text("kms_key_arn", message="KMS Key ARN (optional)", default="")
     ]
     
     answers = inquirer.prompt(questions)
@@ -82,6 +83,8 @@ def create_infra():
     with open(infraid_out, "w") as file:
         file.write(f"{infra_id}")
     
+    kms_key_flag = f" --kms-key-arn {answers['kms_key_arn']}" if answers.get('kms_key_arn', '').strip() else ""
+    
     command = f"{hypershift_command} create infra aws \
   --aws-creds {CFG.get('aws_creds_path')} \
   --base-domain {answers['base_domain']} \
@@ -98,7 +101,7 @@ def create_infra():
   --region {answers['region']} \
   --local-zone-id $(jq -r '.localZoneID' {infra_out}) \
   --public-zone-id $(jq -r '.publicZoneID' {infra_out}) \
-  --private-zone-id $(jq -r '.privateZoneID' {infra_out}) \
+  --private-zone-id $(jq -r '.privateZoneID' {infra_out}){kms_key_flag} \
   --output-file {iam_out}"
     
     print("Executing:", command)
