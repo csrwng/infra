@@ -205,7 +205,7 @@ def render_cluster_yaml(infra, release_image, access_mode, control_plane, infras
         if repo_dir and image_prefix:
             try:
                 result = subprocess.run([
-                    "git", "-C", repo_dir, "rev-parse", "--short=9", "HEAD"
+                    "git", "-C", repo_dir, "rev-parse", "--short", "HEAD"
                 ], capture_output=True, text=True, check=True)
                 short_hash = result.stdout.strip()
                 if short_hash:
