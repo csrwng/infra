@@ -169,6 +169,26 @@ def create_kubeconfig():
     except subprocess.CalledProcessError as e:
         print(f"Error creating kubeconfig: {e}")
 
+def _is_hypershift_repo(directory):
+    """Checks if a directory is a hypershift git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", directory, "remote", "get-url", "origin"],
+            capture_output=True, text=True, check=True)
+        return "hypershift" in result.stdout.strip().lower()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+def _resolve_hypershift_repo_dir():
+    """Returns the hypershift repo directory, preferring CWD if it's a hypershift repo."""
+    cwd = os.getcwd()
+    if _is_hypershift_repo(cwd):
+        return cwd
+    configured = CFG.get("hypershift_repo_dir")
+    if configured and os.path.isdir(configured):
+        return configured
+    return None
+
 def render_cluster_yaml(infra, release_image, access_mode, control_plane, infrastructure, cp_version, local_cpo, node_count, instance_type):
     """Executes an external program to render the cluster YAML."""
     infra_path = os.path.join(CFG.get("infra_dir"), infra)
@@ -180,9 +200,9 @@ def render_cluster_yaml(infra, release_image, access_mode, control_plane, infras
     iam_out = os.path.join(infra_path, "iam.json")
 
     if local_cpo:
-        repo_dir = CFG.get("hypershift_repo_dir")
+        repo_dir = _resolve_hypershift_repo_dir()
         image_prefix = CFG.get("local_cpo_image_prefix")
-        if repo_dir and image_prefix and os.path.isdir(repo_dir):
+        if repo_dir and image_prefix:
             try:
                 result = subprocess.run([
                     "git", "-C", repo_dir, "rev-parse", "--short=9", "HEAD"
