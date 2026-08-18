@@ -51,7 +51,7 @@ def resolve_release_image(version, version_type):
         sys.exit(1)
 
 def get_release_image():
-    choices = ["5.0", "4.23", "4.22", "4.21", "4.20", "4.19", "4.18", "4.17", "4.16", "4.15", "4.14"] + ["Specify release image pullspec"]
+    choices = ["5.1", "5.0", "4.23", "4.22", "4.21", "4.20", "4.19", "4.18", "4.17", "4.16", "4.15", "4.14"] + ["Specify release image pullspec"]
 
     questions = [inquirer.List("selection", message="Select a major version or enter a release image pullspec", choices=choices)]
     answers = safe_prompt(questions)
