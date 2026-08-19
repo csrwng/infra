@@ -24,6 +24,8 @@ GENERIC_DEFAULTS = {
     "external_dns_domain": "",
     "hypershift_repo_dir": "",
     "local_cpo_image_prefix": "",
+    "ci_kubeconfig": "~/data/kubeconfig/ci.kubeconfig",
+    "ci_namespace": "cewong",
 }
 
 
@@ -204,6 +206,16 @@ def prompt_and_write_config(existing_cfg=None):
             message="Local CPO image prefix (e.g. quay.io/you/hypershift) (optional)",
             default=get_default("local_cpo_image_prefix"),
         ),
+        inquirer.Text(
+            "ci_kubeconfig",
+            message="CI management cluster kubeconfig path",
+            default=get_default("ci_kubeconfig"),
+        ),
+        inquirer.Text(
+            "ci_namespace",
+            message="CI management cluster namespace",
+            default=get_default("ci_namespace"),
+        ),
     ]
 
     answers = safe_prompt(questions)
@@ -215,6 +227,7 @@ def prompt_and_write_config(existing_cfg=None):
     answers["kubeconfig_dir"] = expand_path(answers.get("kubeconfig_dir"))
     answers["hypershift_path"] = expand_path(answers.get("hypershift_path"))
     answers["hypershift_repo_dir"] = expand_path(answers.get("hypershift_repo_dir"))
+    answers["ci_kubeconfig"] = expand_path(answers.get("ci_kubeconfig"))
 
     # Ensure directories exist
     if answers.get("infra_dir"):

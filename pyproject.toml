@@ -18,7 +18,8 @@ authors = [{ name = "dev" }]
 [project.scripts]
 infra = "infra:main"
 hc = "cluster:main"
+mgmt = "mgmt:main"
 
 [tool.setuptools]
-py-modules = ["infra", "cluster", "config", "utils"]
+py-modules = ["infra", "cluster", "mgmt", "config", "utils"]
 
