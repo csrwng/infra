@@ -5,6 +5,7 @@ import argparse
 import inquirer
 import requests
 import json
+import re
 
 from utils import safe_prompt, load_input_file, merge_inputs
 from config import ensure_config_exists_or_exit, load_config, run_config_interactive
@@ -33,22 +34,34 @@ def resolve_release_image(version, version_type):
             response = requests.get(url)
             response.raise_for_status()
             data = response.json()
-            return data.get("pullSpec", f"Error: No release image found for {version} {version_type}")
         except requests.RequestException as e:
             print(f"Error fetching latest {version} {version_type} release image: {e}")
             sys.exit(1)
+        if not data.get("pullSpec"):
+            print(f"Error: no release image found for {version} {version_type}")
+            sys.exit(1)
+        return data["pullSpec"]
 
+    # Stable releases live in a per-major stream: 4-stable, 5-stable, ...
+    stream = f"{version.split('.')[0]}-stable"
     try:
-        url = "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/tags"
+        url = f"https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/{stream}/tags"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
-        for tag in data["tags"]:
-            if tag["name"].startswith(version):
-                return tag["pullSpec"]
     except requests.RequestException as e:
-        print(f"Error fetching stable release tags: {e}")
+        print(f"Error fetching {stream} release tags: {e}")
         sys.exit(1)
+    # Tags are newest first. Prefer the newest accepted GA z-stream (e.g. 5.0.1); fall back to the
+    # newest accepted pre-release (rc/ec) when the minor has no GA yet. Match "<version>." so that
+    # "4.2" does not match "4.20".
+    accepted = [t for t in data.get("tags", []) if t.get("phase") == "Accepted" and t["name"].startswith(version + ".")]
+    ga = [t for t in accepted if re.fullmatch(re.escape(version) + r"\.\d+", t["name"])]
+    for candidates in (ga, accepted):
+        if candidates:
+            return candidates[0]["pullSpec"]
+    print(f"Error: no accepted stable release found for {version} in the {stream} stream")
+    sys.exit(1)
 
 def get_release_image():
     choices = ["5.1", "5.0", "4.23", "4.22", "4.21", "4.20", "4.19", "4.18", "4.17", "4.16", "4.15", "4.14"] + ["Specify release image pullspec"]
