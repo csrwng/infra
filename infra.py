@@ -8,7 +8,7 @@ import string
 import json
 import argparse
 from config import ensure_config_exists_or_exit, load_config, run_config_interactive
-from utils import safe_prompt, load_input_file, merge_inputs
+from utils import safe_prompt, load_input_file, merge_inputs, ensure_aws_credentials
 
 CFG = None
 
@@ -61,6 +61,8 @@ def create_infra(params=None):
         answers = safe_prompt(questions)
         params.update(answers)
 
+    ensure_aws_credentials()
+
     infra_dir = CFG.get("infra_dir")
     infra_path = os.path.join(infra_dir, params["name"])
 
@@ -92,8 +94,10 @@ def create_infra(params=None):
 
     kms_key_flag = f" --kms-key-arn {params['kms_key_arn']}" if params.get('kms_key_arn', '').strip() else ""
 
+    # No --aws-creds: the flag is deprecated upstream and the hypershift CLI
+    # resolves credentials through the AWS SDK default chain, which picks up
+    # the SAML credentials awslogin wrote to ~/.aws/credentials.
     command = f"{hypershift_command} create infra aws \
-  --aws-creds {CFG.get('aws_creds_path')} \
   --base-domain {params['base_domain']} \
   --infra-id {infra_id} \
   --name {params['name']} \
@@ -101,7 +105,6 @@ def create_infra(params=None):
   {connectivity_flag_mapping[params['external_connectivity']]} \
   --output-file {infra_out} && \
   {hypershift_command} create iam aws \
-  --aws-creds {CFG.get('aws_creds_path')} \
   --infra-id {infra_id} \
   --oidc-storage-provider-s3-bucket-name {CFG.get('oidc_s3_bucket_name')} \
   --oidc-storage-provider-s3-region {CFG.get('oidc_s3_region')} \
@@ -137,6 +140,8 @@ def destroy_infra(params=None):
         answer = safe_prompt(questions)
         infra_name = answer["infra_name"]
 
+    ensure_aws_credentials()
+
     infra_dir = CFG.get("infra_dir")
     infra_path = os.path.join(infra_dir, infra_name)
     infra_out = os.path.join(infra_path, "infra.json")
@@ -148,7 +153,6 @@ def destroy_infra(params=None):
             data = json.load(file)
 
         command = f"hypershift destroy infra aws --infra-id={data.get('infraID')} --name={data.get('Name')} --region={data.get('region')} \
-    --aws-creds {CFG.get('aws_creds_path')} \
     --base-domain={data.get('baseDomain')}"
         print("Executing:", command)
 
@@ -162,7 +166,7 @@ def destroy_infra(params=None):
         with open(iam_out, "r") as file:
             data = json.load(file)
 
-        command = f"hypershift destroy iam aws --infra-id={data.get('infraID')} --aws-creds {CFG.get('aws_creds_path')} --region={data.get('region')}"
+        command = f"hypershift destroy iam aws --infra-id={data.get('infraID')} --region={data.get('region')}"
         print("Executing:", command)
 
         if execute_command(command) == 0:

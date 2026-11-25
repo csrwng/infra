@@ -7,7 +7,7 @@ import requests
 import json
 import re
 
-from utils import safe_prompt, load_input_file, merge_inputs
+from utils import safe_prompt, load_input_file, merge_inputs, ensure_aws_credentials
 from config import ensure_config_exists_or_exit, load_config, run_config_interactive
 
 CFG = None
@@ -240,8 +240,11 @@ def render_cluster_yaml(infra, release_image, access_mode, control_plane, infras
         print("cannot open infra.json in infrastructure directory")
         return
 
+    ensure_aws_credentials()
+
+    # No --aws-creds: deprecated upstream; the CLI uses the AWS SDK default
+    # chain, which reads the SAML credentials awslogin maintains.
     command = f"{hypershift_cmd} create cluster aws --render \
---aws-creds {CFG.get('aws_creds_path')} \
 --instance-type {instance_type} \
 --region {data.get('region')} \
 --control-plane-availability-policy {control_plane} \

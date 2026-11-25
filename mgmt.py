@@ -5,7 +5,7 @@ import argparse
 import inquirer
 import requests
 
-from utils import safe_prompt, load_input_file, merge_inputs
+from utils import safe_prompt, load_input_file, merge_inputs, ensure_aws_credentials
 from config import ensure_config_exists_or_exit, load_config, run_config_interactive, expand_path
 
 CFG = None
@@ -104,20 +104,43 @@ def install_ho(params=None):
                 pass
 
     pull_secret = CFG.get("pull_secret_path", "")
-    aws_creds = CFG.get("aws_creds_path", "")
     region = CFG.get("region", "us-east-2")
     oidc_bucket = CFG.get("oidc_s3_bucket_name", "")
     oidc_region = CFG.get("oidc_s3_region", region)
     external_dns_domain = CFG.get("external_dns_domain", "")
+    role_prefix = CFG.get("operator_role_prefix", oidc_bucket or "hypershift")
+
+    ensure_aws_credentials()
+
+    # IAM roles instead of credential files.
+    #
+    # Baking a credentials file into the operator used to work with long-lived
+    # access keys, but SAML credentials expire (1h on the rosa-hcp-dev role),
+    # which would silently break the operator shortly after install. Operator
+    # roles are assumed via the management cluster's OIDC provider, so they
+    # refresh themselves and never go stale.
+    roles_file = os.path.join(
+        os.environ.get("TMPDIR", "/tmp"), f"hypershift-operator-roles-{os.getpid()}.json"
+    )
+    roles_command = (
+        f"{hypershift_bin} create operator-roles aws"
+        f" --name-prefix {role_prefix}"
+        f" --oidc-storage-provider-s3-bucket-name {oidc_bucket}"
+        f" --region {oidc_region}"
+        f" --output-file {roles_file}"
+    )
+    print(f"\nCreating/refreshing HyperShift operator IAM roles...\n{roles_command}")
+    if execute_command(roles_command) != 0:
+        print("Failed to create operator IAM roles.")
+        return
 
     command = (
         f"{hypershift_bin} install"
         f" --oidc-storage-provider-s3-bucket-name {oidc_bucket}"
-        f" --oidc-storage-provider-s3-credentials {aws_creds}"
         f" --oidc-storage-provider-s3-region {oidc_region}"
         f" --private-platform AWS"
-        f" --aws-private-creds {aws_creds}"
         f" --aws-private-region {region}"
+        f" --aws-operator-roles-file {roles_file}"
         f" --metrics-set All"
         f" --development"
         f" --platform-monitoring OperatorOnly"
@@ -129,13 +152,17 @@ def install_ho(params=None):
 
     if external_dns_domain:
         command += f" --external-dns-provider=aws"
-        command += f" --external-dns-credentials={aws_creds}"
         command += f" --external-dns-domain-filter={external_dns_domain}"
     if hypershift_image:
         command += f" --hypershift-image {hypershift_image}"
 
     print(f"\nInstalling HyperShift operator...\n{command}")
-    if execute_command(command) != 0:
+    rc = execute_command(command)
+    try:
+        os.remove(roles_file)
+    except OSError:
+        pass
+    if rc != 0:
         print("Failed to install HyperShift operator.")
         return
 
@@ -172,7 +199,7 @@ def create_dev(params=None):
     print(f"Release image: {release_image}")
 
     hypershift_cmd = _resolve_hypershift_binary()
-    aws_creds = CFG.get("aws_creds_path", "")
+    ensure_aws_credentials()
     region = CFG.get("region", "us-east-2")
     base_domain = CFG.get("base_domain", "")
     pull_secret = CFG.get("pull_secret_path", "")
@@ -184,7 +211,6 @@ def create_dev(params=None):
 
     command = (
         f"{hypershift_cmd} create cluster aws"
-        f" --aws-creds {aws_creds}"
         f" --instance-type {instance_type}"
         f" --region {region}"
         f" --auto-repair"
@@ -214,7 +240,8 @@ def destroy_dev(params=None):
 
     ci_kubeconfig = expand_path(CFG.get("ci_kubeconfig", ""))
     ci_namespace = CFG.get("ci_namespace", "cewong")
-    aws_creds = CFG.get("aws_creds_path", "")
+
+    ensure_aws_credentials()
 
     name = params.get("name", os.environ.get("NAME", f"{ci_namespace}-dev"))
 
@@ -222,7 +249,6 @@ def destroy_dev(params=None):
 
     command = (
         f"{_resolve_hypershift_binary()} destroy cluster aws"
-        f" --aws-creds {aws_creds}"
         f" --name {name}"
         f" --namespace {ci_namespace}"
     )
